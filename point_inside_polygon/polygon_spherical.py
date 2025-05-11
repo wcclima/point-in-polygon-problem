@@ -82,7 +82,7 @@ class PolygonS(object):
         y = np.sin(np.pi/2. - lat_rad)*np.sin(lon_rad)
         z = np.cos(np.pi/2. - lat_rad)
 
-        return np.array([x, y, z])
+        return x, y, z
     
 
     def _tangent_space_basis(self, lat, lon):
@@ -120,7 +120,15 @@ class PolygonS(object):
         return np.array([e1_x, e1_y, e1_z]), np.array([e2_x, e2_y, e2_z])
 
 
-    def _intersect(self, vertex1_lat, vertex1_lon, vertex2_lat, vertex2_lon, fixed_point_lat, fixed_point_lon, point_lat, point_lon):
+    def _intersect(
+            self, 
+            vertices_lat, 
+            vertices_lon, 
+            fixed_point_lat, 
+            fixed_point_lon, 
+            point_lat, 
+            point_lon
+            ):
         
         """
         Checks whether the shorter segment of the great circle r, connecting the fixed point
@@ -156,21 +164,37 @@ class PolygonS(object):
 
         """
 
-        v1 = self._3d_vector(vertex1_lat, vertex1_lon)
-        v2 = self._3d_vector(vertex2_lat, vertex2_lon)
-        x = self._3d_vector(fixed_point_lat, fixed_point_lon)
-        p = self._3d_vector(point_lat, point_lon)
+        vertices_x, vertices_y, vertices_z = self._3d_vector(vertices_lat, vertices_lon)
+        q_x, q_y, q_z = self._3d_vector(np.repeat(fixed_point_lat, self.n_vertices), np.repeat(fixed_point_lon, self.n_vertices))
+        p_x, p_y, p_z = self._3d_vector(np.repeat(point_lat, self.n_vertices), np.repeat(point_lon, self.n_vertices))
 
-        t_12 = (v2 - np.dot(v1, v2)*v1)/np.sqrt(1. - np.dot(v1, v2)**2)
-        t_xp = (x - np.dot(x, p)*p)/np.sqrt(1. - np.dot(x, p)**2)
+        cos_angle_v1v2 = vertices_x[:self.n_vertices]*vertices_x[1:] + vertices_y[:self.n_vertices]*vertices_y[1:] + vertices_z[:self.n_vertices]*vertices_z[1:]
+        cos_angle_qp = q_x*p_x + q_y*p_y + q_z*p_z
 
-        alpha_12 = np.arccos(np.dot(v1,v2))
-        beta_xp = np.arccos(np.dot(x,p))
-
-        alpha = np.arctan((1. - np.dot(v1, p)**2 - np.dot(v1, t_xp)**2)/(np.dot(p, t_12)*np.dot(p, v1) + np.dot(t_xp, t_12)*np.dot(t_xp, v1))) 
-        beta = np.arctan((1. - np.dot(p, v1)**2 - np.dot(p, t_12)**2)/(np.dot(v1, t_xp)*np.dot(p, v1) + np.dot(t_12, t_xp)*np.dot(t_12, p)))
+        norm_v1v2 = np.sqrt(1. - cos_angle_v1v2**2)
+        t_12_x = (vertices_x[1:] - cos_angle_v1v2*vertices_x[:self.n_vertices])/norm_v1v2
+        t_12_y = (vertices_y[1:] - cos_angle_v1v2*vertices_y[:self.n_vertices])/norm_v1v2
+        t_12_z = (vertices_z[1:] - cos_angle_v1v2*vertices_z[:self.n_vertices])/norm_v1v2
         
-        return (alpha >= 0.)&(alpha <= alpha_12)&(beta >= 0)&(beta <= beta_xp)        
+        norm_qp = np.sqrt(1. - cos_angle_qp**2)
+        t_qp_x = (p_x - cos_angle_qp*q_x)/norm_qp
+        t_qp_y = (p_y - cos_angle_qp*q_y)/norm_qp
+        t_qp_z = (p_z - cos_angle_qp*q_z)/norm_qp
+
+        angle_v1v2 = np.arccos(cos_angle_v1v2)
+        angle_qp = np.arccos(cos_angle_qp)
+
+        cos_angle_qv1 = q_x*vertices_x[:self.n_vertices] + q_y*vertices_y[:self.n_vertices] + q_z*vertices_z[:self.n_vertices]
+        cos_angle_tqpv1 = t_qp_x*vertices_x[:self.n_vertices] + t_qp_y*vertices_y[:self.n_vertices] + t_qp_z*vertices_z[:self.n_vertices]
+        cos_angle_qt12 = q_x*t_12_x + q_y*t_12_y + q_z*t_12_z
+        cos_angle_tqpt12 = t_qp_x*t_12_x + t_qp_y*t_12_y + t_qp_z*t_12_z
+
+        alpha = np.arctan2(1. - cos_angle_qv1**2 - cos_angle_tqpv1**2,cos_angle_qt12*cos_angle_qv1 + cos_angle_tqpt12*cos_angle_tqpv1) 
+        alpha_prime = np.arctan2(1. - cos_angle_qv1**2 - cos_angle_qt12**2,cos_angle_tqpv1*cos_angle_qv1 + cos_angle_tqpt12*cos_angle_qt12)
+
+        inside = (alpha >= 0.)&(alpha <= angle_v1v2)&(alpha_prime >= 0)&(alpha_prime <= angle_qp)
+        
+        return inside       
     
 
     def create(self, anchor_point, n_vertices, angular_dist_min, angular_dist_max, angular_separation = 'regular', direction='clockwise'):
@@ -218,7 +242,8 @@ class PolygonS(object):
 
         lat_0, lon_0 = self.anchor_point
 
-        r_0 = self._3d_vector(lat_0, lon_0)
+        r_0_x, r_0_y, r_0_z = self._3d_vector(lat_0, lon_0)
+        r_0 = np.array([r_0_x, r_0_y, r_0_z])
         e1_hat, e2_hat = self._tangent_space_basis(lat_0, lon_0)
 
         if angular_separation == 'regular':
@@ -241,7 +266,7 @@ class PolygonS(object):
         r = np.array([np.cos(beta_i)*r_0 + np.sin(beta_i)*t_0_i for beta_i, t_0_i in zip(beta, t_0)])
 
         self.vertices_lat = np.array([np.pi/2. - np.arccos(z_i) for z_i in r.T[2]])
-        self.vertices_lon = np.array([np.arctan(y_i/x_i) for x_i, y_i in zip(r.T[0], r.T[1])])
+        self.vertices_lon = np.array([np.arctan2(y_i,x_i) for x_i, y_i in zip(r.T[0], r.T[1])])
 
         self.vertices_lat = np.append(self.vertices_lat, self.vertices_lat[0])
         self.vertices_lon = np.append(self.vertices_lon, self.vertices_lon[0])
@@ -287,18 +312,14 @@ class PolygonS(object):
             
         """
 
-        count = 0
-
-        for i in range(self.n_vertices):
-            count += self._intersect(
-                self.vertices_lat[i], 
-                self.vertices_lon[i], 
-                self.vertices_lat[i + 1], 
-                self.vertices_lon[i + 1], 
-                self.anchor_point[0],
-                self.anchor_point[1],  
-                p_lat, p_lon
-                )
+        count = self._intersect(
+            self.vertices_lat, 
+            self.vertices_lon, 
+            self.anchor_point[0], 
+            self.anchor_point[1], 
+            p_lat, 
+            p_lon
+            ).sum()
         
         if self.is_anchor_point_inside:
             if count % 2:
