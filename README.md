@@ -1,5 +1,5 @@
 # Point in polygon problem
-Implementation of the *ray-crossing algorithm* to decide whether a point is inside or outside a polygon.
+Implementation of the [*ray-crossing algorithm*](https://en.wikipedia.org/wiki/Point_in_polygon) to decide whether a point is inside or outside a polygon.
 
 ## 1 - Objective
 
