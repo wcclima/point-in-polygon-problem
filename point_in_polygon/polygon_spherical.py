@@ -171,12 +171,16 @@ class PolygonS(object):
         cos_angle_v1v2 = vertices_x[:self.n_vertices]*vertices_x[1:] + vertices_y[:self.n_vertices]*vertices_y[1:] + vertices_z[:self.n_vertices]*vertices_z[1:]
         cos_angle_qp = q_x*p_x + q_y*p_y + q_z*p_z
 
+        epsilon = 1e-15
+        
         norm_v1v2 = np.sqrt(1. - cos_angle_v1v2**2)
+        norm_v1v2 += (norm_v1v2 < np.finfo(float).eps)*epsilon
         t_12_x = (vertices_x[1:] - cos_angle_v1v2*vertices_x[:self.n_vertices])/norm_v1v2
         t_12_y = (vertices_y[1:] - cos_angle_v1v2*vertices_y[:self.n_vertices])/norm_v1v2
         t_12_z = (vertices_z[1:] - cos_angle_v1v2*vertices_z[:self.n_vertices])/norm_v1v2
         
         norm_qp = np.sqrt(1. - cos_angle_qp**2)
+        norm_qp += (norm_qp < np.finfo(float).eps)*epsilon
         t_qp_x = (p_x - cos_angle_qp*q_x)/norm_qp
         t_qp_y = (p_y - cos_angle_qp*q_y)/norm_qp
         t_qp_z = (p_z - cos_angle_qp*q_z)/norm_qp
