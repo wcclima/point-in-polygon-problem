@@ -49,7 +49,15 @@ class PolygonE(object):
         self.vertices_y = None
 
 
-    def _intersect(self, vertex1_x, vertex1_y, vertex2_x, vertex2_y, p_x, p_y, tan_vec_x, tan_vec_y):
+    def _intersect(
+            self, 
+            vertex1_x, 
+            vertex1_y, 
+            vertex2_x, 
+            vertex2_y, 
+            p_x, 
+            p_y
+            ):
 
         """
         Checks whether the half line r starting at the point p = (p_x, py) and with 
@@ -80,19 +88,17 @@ class PolygonE(object):
                 Whether the half line r crosses the segment s.
         """
 
-        # segment tangent vector components
-        l_x = vertex2_x - vertex1_x
-        l_y = vertex2_y - vertex1_y
+        epsilon = 1e-15
+        inside = False
+        if ((vertex1_y > p_y) != (vertex2_y > p_y)):
 
-        # determinant of the coefficient matrix
-        det = -tan_vec_x*l_y + tan_vec_y*l_x
-        if det == 0.:
-            return False
-        else: 
-            alpha = (tan_vec_y*(p_x - vertex1_x) - tan_vec_x*(p_y - vertex1_y))/det
-            beta = (l_y*(p_x - vertex1_x) - l_x*(p_y - vertex1_y))/det
+            x_intersect = (vertex2_x - vertex1_x)*(p_y - vertex1_y)/(vertex2_y - vertex1_y + epsilon) + vertex1_x
 
-            return (np.abs(det) > np.finfo(float).eps)&(alpha >= 0.)&(alpha <= 1.)&(beta >= 0.)
+            if p_x < x_intersect:
+
+                inside = not inside
+
+        return inside
         
 
     def create(self, anchor_point = (0.,0.), n_vertices=3, dist_min=0.5, dist_max=1., angular_separation = 'regular', direction='anticlockwise'):
@@ -132,6 +138,7 @@ class PolygonE(object):
         """
 
         self.n_vertices = n_vertices
+        self.direction = direction
 
         if angular_separation == 'regular':
             theta = np.linspace(0,2.*np.pi,self.n_vertices, endpoint = False)
@@ -186,7 +193,6 @@ class PolygonE(object):
 
         """
 
-        vector_x, vector_y = 2.*np.random.rand(2) - 1.
         count = 0
 
         for i in range(self.n_vertices):
@@ -194,8 +200,8 @@ class PolygonE(object):
                                      self.vertices_y[i], 
                                      self.vertices_x[i+1], 
                                      self.vertices_y[i+1], 
-                                     p_x, p_y, 
-                                     vector_x, vector_y
+                                     p_x, 
+                                     p_y
                                     )
             
         if count % 2:
