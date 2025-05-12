@@ -51,54 +51,46 @@ class PolygonE(object):
 
     def _intersect(
             self, 
-            vertex1_x, 
-            vertex1_y, 
-            vertex2_x, 
-            vertex2_y, 
+            vertices_x, 
+            vertices_y,  
             p_x, 
             p_y
             ):
 
         """
-        Checks whether the half line r starting at the point p = (p_x, py) and with 
-        tangent vector t = (tan_vec_x, tan_vec_y) crosses the segment s defined by the 
-        points v1 = (vertex1_x, vertex1_y) and v2 = (vertex2_x, vertex2_y). It solves
-        the linear system defined by defined by the crossing of r and s.
+        Checks whether the horizontal half line starting at the point p = (p_x, py) and positive
+        oriented with respect to the y-axis crosses the sides of the polygon (i.e. the segments 
+        formed by two consecutives vertices). The number of crossings is determined by checking 
+        the p_x with respect to the x-coordinate of the crossing point, if it exists.
 
-        Returns True if the half line r intersects the line segment s and False otherwise.
+        Returns an array-like of bools, where True means a crossing.
 
 
         Keyword arguments:
-            vertex1_{x/y} (float):
-                The {x/y}-coordinate of the vertex 1.
-
-            vertex2_{x/y} (float):
-                The {x/y}-coordinate of the vertex 2.
+            vertices_{x/y} (float):
+                The {x/y}-coordinate of the polygon vertices.
 
             p_{x/y} (float):
                 The {x/y}-coordinate of the half line starting point p.
 
-            tan_vec_{x/y} (float):
-                The {x/y}-component of the tangent vector of the half 
-                line starting point p.
-
 
         Returns: 
-            bool: 
-                Whether the half line r crosses the segment s.
+            crossed (np.ndarray): ndarray of bools with shape (n_vertices,) 
+                Whether the horizontal half-line starting at p crossed the sides of the polygon.
         """
 
         epsilon = 1e-15
-        inside = False
-        if ((vertex1_y > p_y) != (vertex2_y > p_y)):
 
-            x_intersect = (vertex2_x - vertex1_x)*(p_y - vertex1_y)/(vertex2_y - vertex1_y + epsilon) + vertex1_x
+        cond1 = (vertices_y[:self.n_vertices] > p_y) != (vertices_y[1:] > p_y)
 
-            if p_x < x_intersect:
+        x_intersect = (vertices_x[1:] - vertices_x[:self.n_vertices]
+                       )*(p_y - vertices_y[:self.n_vertices]
+                          )/(vertices_y[1:] - vertices_y[:self.n_vertices] + epsilon
+                             ) + vertices_x[:self.n_vertices]
+        cond2 = p_x < x_intersect
+        crossed = cond1 & cond2
 
-                inside = not inside
-
-        return inside
+        return crossed
         
 
     def create(self, anchor_point = (0.,0.), n_vertices=3, dist_min=0.5, dist_max=1., angular_separation = 'regular', direction='anticlockwise'):
@@ -173,12 +165,12 @@ class PolygonE(object):
         """
         Checks whether the point p = (p_x, p_y) is inside the polygon.
 
-        For a given point p, it checks how many times the half line starting 
-        at p with a random tangent vector crosses the sides of the polygon. An
-        odd number of crosses indicates that p is inside the polygon and an even 
-        number of crosses indicates p is outside.
+        For a given point p, it counts how many times the horizontal half-line 
+        starting at p crosses the sides of the polygon. An odd number of crosses 
+        indicates that p is inside the polygon and an even number of crosses 
+        indicates p is outside.
 
-        Returns Irue if the point is inside the polygon and False otherwise.
+        Returns True if the point is inside the polygon and False otherwise.
 
         Keyword arguments:
             p_x (float):
@@ -193,18 +185,14 @@ class PolygonE(object):
 
         """
 
-        count = 0
-
-        for i in range(self.n_vertices):
-            count += self._intersect(self.vertices_x[i], 
-                                     self.vertices_y[i], 
-                                     self.vertices_x[i+1], 
-                                     self.vertices_y[i+1], 
-                                     p_x, 
-                                     p_y
-                                    )
+        crossings = self._intersect(
+            self.vertices_x, 
+            self.vertices_y,
+            p_x, 
+            p_y
+            ).sum()
             
-        if count % 2:
+        if crossings % 2:
             return True
         else:
             return False
