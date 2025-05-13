@@ -1,4 +1,5 @@
 import numpy as np
+from prettytable import PrettyTable
 
 __all__ = ["PolygonS"]
 
@@ -17,9 +18,6 @@ class PolygonS(object):
 
         anchor_point (tuple): 
             The tuple with the latitude and longitude of the anchor point, in degrees.
-
-        is_anchor_point_inside (bool): 
-            It is True if the anchor point is inside the polygon.
         
         direction (str, default = 'anticlockwise'): 
             The direction of the circuit formed by the sides of the polygon.
@@ -30,6 +28,11 @@ class PolygonS(object):
 
         vertices_lon (np.ndarray): array of shape (n_vertices + 1,).
             The vertices longitude, in degrees.
+
+        inside (list): a list of bools.
+            The check of whether points are inside or outside 
+            the polygon.
+
 
             
     Methods:
@@ -53,7 +56,7 @@ class PolygonS(object):
         self.vertices_lat = None
         self.vertices_lon = None
         self.anchor_point = None
-        self.is_anchor_point_inside = None
+        self.inside = None
 
 
     def _3d_vector(self, lat, lon):
@@ -123,53 +126,37 @@ class PolygonS(object):
     def _intersect(
             self, 
             vertices_lat, 
-            vertices_lon, 
-            fixed_point_lat, 
-            fixed_point_lon, 
+            vertices_lon,  
             point_lat, 
             point_lon
             ):
         
         """
-        Checks whether the shorter segment of the great circle r, connecting the fixed point
-        x = (fixed_point_lat, fixed_point_lon) to the point of interest p = (point_lat, point_lon),
-        crosses the shorter segment of the great circle s defined by the points 
-        v1 = (vertex1_x, vertex1_y) and v2 = (vertex2_x, vertex2_y). The check is performed 
-        in the embeding 3-d Euclidean space. It compares the components os radius vectors of 
-        the two great circles at the intersection point using the basis of the plane that 
-        contains the great circles formed by the radius and tangent vectors of the great circle.
-        
-        Returns True if the shorter segment of the great circle r connecting the fixed point x 
-        and the point of interest p intersects the shorter segment of the great circle segment s 
-        defined by the vertices v1 and v2.
+        Checks whether the west-east great circle starting at the point p = (point_lat, point_lon)
+        crosses the sides of the polygon (i.e. any great circle segment between two consecutive 
+        polygon vertices). The number of crossings is determined by checking 
+        point_lon with respect to the longitude of the crossing point, if it exists.
+
+        Returns an array-like of bools, where True means a crossing.
 
 
         Keyword arguments:
-            vertex1_{lat/lon} (float):
-                The {latitude/longitude} of the vertex 1 in degrees.
-
-            vertex2_{lat/lon} (float):
-                The {latitude/longitude} of the vertex 2 in degrees.
-
-            fixed_point_{lat/lon} (float):
-                The {latitude/longitude} of the fixed point in degrees.
+            vertices_{lat/lon} (float):
+                The {latitude/longitude} of the polygon vertices in degrees.
 
             p_{lat/lon} (float):
                 The {latitude/longitude} of the point of interest p in degrees.
 
 
         Returns: 
-            bool: 
-                Whether the great circle r crosses the great circle s.
+            crossed (np.ndarray): ndarray of bools with shape (n_vertices,) 
+                Whether the great circle starting at p crossed the sides of the polygon.
 
         """
 
         vertices_x, vertices_y, vertices_z = self._3d_vector(vertices_lat, vertices_lon)
-        q_x, q_y, q_z = self._3d_vector(np.repeat(fixed_point_lat, self.n_vertices), np.repeat(fixed_point_lon, self.n_vertices))
         p_x, p_y, p_z = self._3d_vector(np.repeat(point_lat, self.n_vertices), np.repeat(point_lon, self.n_vertices))
-
         cos_angle_v1v2 = vertices_x[:self.n_vertices]*vertices_x[1:] + vertices_y[:self.n_vertices]*vertices_y[1:] + vertices_z[:self.n_vertices]*vertices_z[1:]
-        cos_angle_qp = q_x*p_x + q_y*p_y + q_z*p_z
 
         epsilon = 1e-15
         
@@ -178,33 +165,30 @@ class PolygonS(object):
         t_12_x = (vertices_x[1:] - cos_angle_v1v2*vertices_x[:self.n_vertices])/norm_v1v2
         t_12_y = (vertices_y[1:] - cos_angle_v1v2*vertices_y[:self.n_vertices])/norm_v1v2
         t_12_z = (vertices_z[1:] - cos_angle_v1v2*vertices_z[:self.n_vertices])/norm_v1v2
+
+        t_p_x = -np.sin(np.pi/2. - np.radians(point_lat))*np.sin(np.radians(point_lon))
+        t_p_y = np.sin(np.pi/2. - np.radians(point_lat))*np.cos(np.radians(point_lon))
+        t_p_z = 0
+
+        cos_angle_pv1 = p_x*vertices_x[:self.n_vertices] + p_y*vertices_y[:self.n_vertices] + p_z*vertices_z[:self.n_vertices]
+        cos_angle_tpv1 = t_p_x*vertices_x[:self.n_vertices] + t_p_y*vertices_y[:self.n_vertices] + t_p_z*vertices_z[:self.n_vertices]
+        cos_angle_pt12 = p_x*t_12_x + p_y*t_12_y + p_z*t_12_z
+        cos_angle_tpt12 = t_p_x*t_12_x + t_p_y*t_12_y + t_p_z*t_12_z
+
+        alpha_prime = np.arctan2(1. - cos_angle_pv1**2 - cos_angle_pt12**2,cos_angle_tpv1*cos_angle_pv1 + cos_angle_tpt12*cos_angle_pt12)
+
+        cond1 = (vertices_lat[:self.n_vertices] > point_lat) != (vertices_lat[1:] > point_lat)
+        cond2 = np.radians(point_lon) < alpha_prime
+
+        crossed = cond1 & cond2
         
-        norm_qp = np.sqrt(1. - cos_angle_qp**2)
-        norm_qp += (norm_qp < np.finfo(float).eps)*epsilon
-        t_qp_x = (p_x - cos_angle_qp*q_x)/norm_qp
-        t_qp_y = (p_y - cos_angle_qp*q_y)/norm_qp
-        t_qp_z = (p_z - cos_angle_qp*q_z)/norm_qp
-
-        angle_v1v2 = np.arccos(cos_angle_v1v2)
-        angle_qp = np.arccos(cos_angle_qp)
-
-        cos_angle_qv1 = q_x*vertices_x[:self.n_vertices] + q_y*vertices_y[:self.n_vertices] + q_z*vertices_z[:self.n_vertices]
-        cos_angle_tqpv1 = t_qp_x*vertices_x[:self.n_vertices] + t_qp_y*vertices_y[:self.n_vertices] + t_qp_z*vertices_z[:self.n_vertices]
-        cos_angle_qt12 = q_x*t_12_x + q_y*t_12_y + q_z*t_12_z
-        cos_angle_tqpt12 = t_qp_x*t_12_x + t_qp_y*t_12_y + t_qp_z*t_12_z
-
-        alpha = np.arctan2(1. - cos_angle_qv1**2 - cos_angle_tqpv1**2,cos_angle_qt12*cos_angle_qv1 + cos_angle_tqpt12*cos_angle_tqpv1) 
-        alpha_prime = np.arctan2(1. - cos_angle_qv1**2 - cos_angle_qt12**2,cos_angle_tqpv1*cos_angle_qv1 + cos_angle_tqpt12*cos_angle_qt12)
-
-        inside = (alpha >= 0.)&(alpha <= angle_v1v2)&(alpha_prime >= 0)&(alpha_prime <= angle_qp)
-        
-        return inside       
+        return crossed       
     
 
     def create(self, anchor_point, n_vertices, angular_dist_min, angular_dist_max, angular_separation = 'regular', direction='clockwise'):
 
         """
-        Creates a polygon in the 2-d spherical surgace with radius 1. The polygon is build
+        Creates a polygon in the 2-d spherical surface with radius 1. The polygon is build
         by first choosing an anchor point on that surface and then "launching" the vertices
         from it. The vertices are launched along a great circle defined by the chosend angular 
         distance from the anchor point and the tangent vector at the anchor point. The angular
@@ -261,12 +245,6 @@ class PolygonS(object):
         beta = (angular_dist_max - angular_dist_min)*np.random.rand(n_vertices) + angular_dist_min
         beta = np.radians(beta)
 
-        if (beta < 0.).sum():
-            self.is_anchor_point_inside = False
-        
-        else:
-            self.is_anchor_point_inside = True
-
         r = np.array([np.cos(beta_i)*r_0 + np.sin(beta_i)*t_0_i for beta_i, t_0_i in zip(beta, t_0)])
 
         self.vertices_lat = np.array([np.pi/2. - np.arccos(z_i) for z_i in r.T[2]])
@@ -290,49 +268,63 @@ class PolygonS(object):
         return
 
     
-    def internal_point(self,p_lat, p_lon):
+    def internal_point(self, p , labels = None):
 
         """
-        Checks whether the point p = (p_lat, p_lon) is inside the polygon.
+        Checks whether points p are inside the polygon.
 
-        For a given point p, it checks how many times the shorter segment of 
-        the great circle connecting p to the anchor point. If the anchor 
-        point is inside (outside) the polygon, then an odd number of 
-        crossings indicates that p is inside (outside) the polygon and 
-        an even number of crossings indicates p is outside (inside).
+        For a given point, it counts how many times the great circle 
+        starting at it crosses the sides of the polygon. An odd number of crosses 
+        indicates that the point is inside the polygon and an even number of crosses 
+        indicates it is outside.
 
-        Returns Irue if the point is inside the polygon and False otherwise.
+        Returns True if the point is inside the polygon and False otherwise.
 
         Keyword arguments:
-            p_x (float):
-                The x-coordinate of the point one whishes to check.
+            p (array): array-like of shape (2,) in the case of one point or
+            of shape (n_points, 2) in the case of n_points.
+                The latitude/longitude of the point or a list of pairs for a 
+                number of points
 
-            p_y (float):
-                The y-coordinate of the point one whishes to check.
-
+            labels(array, default = None): array-like of shape (n_points,)
+                The labels of the points.
 
         Returns:
-            bool
+            Table of the point labels, their coordinates and whether they 
+            are inside or ouside the polygon.
             
         """
 
-        count = self._intersect(
-            self.vertices_lat, 
-            self.vertices_lon, 
-            self.anchor_point[0], 
-            self.anchor_point[1], 
-            p_lat, 
-            p_lon
-            ).sum()
-        
-        if self.is_anchor_point_inside:
-            if count % 2:
-                return False
+        self.inside = []
+
+        if len(p) == 2:
+            points = np.array([p])
+        elif (len(p) > 2):
+            points = np.array([i for i in p])
+
+        n_points = len(points)
+
+        for pt in points:
+
+            crossings = self._intersect(
+                self.vertices_lat, 
+                self.vertices_lon,
+                pt[0], 
+                pt[1]
+                ).sum()
+            
+            if crossings % 2:
+                self.inside.append(True)
             else:
-                return True
-        
+                self.inside.append(False)
+
+        table = PrettyTable(["point",  "(lat, lon)", "is inside"])
+        if labels:
+            for i in range(n_points):
+                table.add_row([labels[i], f"{(points[i][0], points[i][1])}", self.inside[i]])
+
         else:
-            if count % 2:
-                return True
-            else:
-                return False
+            for i in range(n_points):
+                table.add_row([i + 1, f"{(points[i][0], points[i][1])}", self.inside[i]])
+
+        return table
