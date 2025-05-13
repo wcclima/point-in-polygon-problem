@@ -1,4 +1,5 @@
 import numpy as np
+from prettytable import PrettyTable
 
 __all__ = ["PolygonE"]
 
@@ -25,14 +26,19 @@ class PolygonE(object):
         vertices_y (np.ndarray): array of shape (n_vertices + 1,).
             The vertices y-coordinate.
 
+        inside (list): a list of bools.
+            The check of whether points are inside or outside 
+            the polygon.
+
+
             
     Methods:
 
         create(anchor_point, n_vertices, dist_min, dist_max, angular_separation, direction):
             Creates the polygon by defining its vertices xy-coordinates.
 
-        internal_point(p_x, p_y):
-            Checks weather the point p = (p_x, p_y) is inside or outside the polygon.
+        internal_point(p, labels):
+            Checks weather the points p are inside or outside the polygon.
 
     """
 
@@ -47,6 +53,8 @@ class PolygonE(object):
         self.direction = None
         self.vertices_x = None
         self.vertices_y = None
+        self.anchor_point = None
+        self.inside = None
 
 
     def _intersect(
@@ -61,7 +69,7 @@ class PolygonE(object):
         Checks whether the horizontal half line starting at the point p = (p_x, py) and positive
         oriented with respect to the y-axis crosses the sides of the polygon (i.e. the segments 
         formed by two consecutives vertices). The number of crossings is determined by checking 
-        the p_x with respect to the x-coordinate of the crossing point, if it exists.
+        p_x with respect to the x-coordinate of the crossing point, if it exists.
 
         Returns an array-like of bools, where True means a crossing.
 
@@ -131,6 +139,7 @@ class PolygonE(object):
 
         self.n_vertices = n_vertices
         self.direction = direction
+        self.anchor_point = anchor_point
 
         if angular_separation == 'regular':
             theta = np.linspace(0,2.*np.pi,self.n_vertices, endpoint = False)
@@ -160,10 +169,10 @@ class PolygonE(object):
         return
     
 
-    def internal_point(self, p_x, p_y):
+    def internal_point(self, p, labels = None):
         
         """
-        Checks whether the point p = (p_x, p_y) is inside the polygon.
+        Checks whether points p are inside the polygon.
 
         For a given point p, it counts how many times the horizontal half-line 
         starting at p crosses the sides of the polygon. An odd number of crosses 
@@ -173,26 +182,50 @@ class PolygonE(object):
         Returns True if the point is inside the polygon and False otherwise.
 
         Keyword arguments:
-            p_x (float):
-                The x-coordinate of the point one whishes to check.
+            p (array): array-like of shape (2,) in the case of one point or
+            of shape (n_points, 2) in the case of n_points.
+                The xy-coordinates of the point or a list of pairs for a 
+                number of points
 
-            p_y (float):
-                The y-coordinate of the point one whishes to check.
-
+            labels(array, default = None): array-like of shape (n_points,)
+                The labels of the points.
 
         Returns:
-            bool
+            Table of the point labels, their coordinates and whether they 
+            are inside or ouside the polygon.
 
         """
 
-        crossings = self._intersect(
-            self.vertices_x, 
-            self.vertices_y,
-            p_x, 
-            p_y
-            ).sum()
+        self.inside = []
+
+        if len(p) == 2:
+            points = np.array([p])
+        elif (len(p) > 2):
+            points = np.array([i for i in p])
+
+        n_points = len(points)
+
+        for pt in points:
+
+            crossings = self._intersect(
+                self.vertices_x, 
+                self.vertices_y,
+                pt[0], 
+                pt[1]
+                ).sum()
             
-        if crossings % 2:
-            return True
+            if crossings % 2:
+                self.inside.append(True)
+            else:
+                self.inside.append(False)
+
+        table = PrettyTable(["point",  "(x, y)", "is inside"])
+        if labels:
+            for i in range(n_points):
+                table.add_row([labels[i], f"{(points[i][0], points[i][1])}", self.inside[i]])
+
         else:
-            return False
+            for i in range(n_points):
+                table.add_row([i + 1, f"{(points[i][0], points[i][1])}", self.inside[i]])
+
+        return table
