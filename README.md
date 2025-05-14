@@ -13,6 +13,13 @@ It contains the point-in-polygon modules. See also Module architecture below.
 **`notebooks/:` Notebooks demonstrating the modules**
 - `PointInPolygon.ipynb`: Notebook discussing the basics of the the ray-crossing algorithm and showing the main fetures of the modules
 
+**`pictures/:` Pictures generated with the module**
+- `irre_euclidean_polygon.png`
+- `re_euclidean_polygon.png`
+- `irre_spherical_polygon.png`
+- `re_spherical_polygon.png`
+
+
 ## 3 - Module architecture
 
 Description of the module `molecular_dynamics` architecture.
