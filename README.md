@@ -49,8 +49,106 @@ Description of the module `molecular_dynamics` architecture.
 
 ## 5 - Results
 
-TO DO
+As a test to the classes `PolygonE` and `PolygonS`, we have generated two polygons using each class, one irregular and the other regular, using the method `create`. We then considered a few points and checked if they where inside or outside the polygon using the method `inside_polygon`. 
+
+### 5.1 - Euclidean polygon
+
+- **Irregular Euclidean polygon**
+<br>
+
+![Alt text](pictures/irreg_euclidean_polygon.png)
+<div align="center">
+  
+*Figure 1: Irregular Euclidean polygon with 9 vertices and four points to be checked.*
+
+</div>
+<br><br>
+Here is the result using the `inside_polygon` method.
+<div align="center">
+  
+| point  |   (x, y)   | is inside |
+|--------|------------|-----------|
+| anchor | (5.0, 5.0) |    True   |
+|   A    | (4.1, 3.8) |    True   |
+|   B    | (1.8, 2.5) |   False   |
+|   C    | (6.8, 5.3) |   False   |
+
+</div>
+<br><br>
+
+- **Regular Euclidean polygon**
+<br>
+
+![Alt text](pictures/reg_euclidean_polygon.png)
+<div align="center">
+  
+*Figure 2: Regular Euclidean polygon with 12 vertices and four points to be checked.*
+
+</div>
+<br><br>
+Here is the result using the `inside_polygon` method.
+<div align="center">
+
+| point  |   (x, y)   | is inside |
+|--------|------------|-----------|
+| anchor | (5.0, 5.0) |    True   |
+|   A    | (4.1, 3.8) |    True   |
+|   B    | (1.8, 2.5) |   False   |
+|   C    | (6.8, 5.3) |    True   |
+
+</div>
+<br><br>
+
+### 5.2 - Spherical polygons
+
+- **Irregular spherical polygon**
+<br>
+
+![Alt text](pictures/irreg_spherical_polygon.png)
+<div align="center">
+  
+*Figure 3: Irregular spherical polygon with 26 vertices and five points to be checked.*
+
+</div>
+<br><br>
+Here is the result using the `inside_polygon` method.
+<div align="center">
+
+  
+| point  |   (lat, lon)   | is inside |
+|--------|----------------|-----------|
+| anchor |  (53.0, 13.0)  |    True   |
+|   A    | (53.05, 13.05) |    True   |
+|   B    |  (53.1, 12.3)  |   False   |
+|   C    |  (53.2, 13.3)  |    True   |
+|   D    | (52.85, 12.85) |    True   |
+
+</div>
+<br><br>
+
+- **Regular spherical polygon**
+<br>
+
+![Alt text](pictures/reg_spherical_polygon.png)
+<div align="center">
+  
+*Figure 4: Regular spherical polygon with 12 vertices and five points to be checked.*
+
+</div>
+<br><br>
+Here is the result using the `inside_polygon` method.
+<div align="center">
+  
+| point  |   (lat, lon)   | is inside |
+|--------|----------------|-----------|
+| anchor |  (53.0, 13.0)  |    True   |
+|   A    | (53.05, 13.05) |    True   |
+|   B    |  (53.1, 12.3)  |   False   |
+|   C    |  (53.2, 13.3)  |    True   |
+|   D    | (52.85, 12.85) |    True   |
+
+</div>
 
 ## 6 - Bibliography
 
-TO DO
+- [M. Bevis and J.-L. Chatelain, Locating a point on a spherical surface relative to a spherical polygon of arbitrary shape. *Mathematical Geology* *21*, 811 (1989)](https://link.springer.com/article/10.1007/BF00894449).
