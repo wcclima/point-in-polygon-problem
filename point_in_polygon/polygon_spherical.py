@@ -190,7 +190,7 @@ class PolygonS(object):
         """
         Creates a polygon in the 2-d spherical surface with radius 1. The polygon is build
         by first choosing an anchor point on that surface and then "launching" the vertices
-        from it. The vertices are launched along a great circle defined by the chosend angular 
+        from it. The vertices are launched along a great circle defined by the chosen angular 
         distance from the anchor point and the tangent vector at the anchor point. The angular
         distance between the anchor point and the vertex can be random within the interval 
         [angular_dist_min, angular_dist_max] and angular separation between the vertices
